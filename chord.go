@@ -29,7 +29,7 @@ func helpCommand() {
 	fmt.Println("quit:              Ends the program")
 }
 
-func main() {
+func allCommands() {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Please enter a command:")
 	for scanner.Scan() {
@@ -55,6 +55,14 @@ func main() {
 			fmt.Println("Here is your node info")
 		case "quit":
 			fmt.Println("You quit")
+			os.Exit(3)
+		default:
+			fmt.Println("not a valid command")
 		}
 	}
+
+}
+
+func main() {
+	allCommands()
 }
