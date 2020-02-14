@@ -37,6 +37,14 @@ func jump(address string, fingerentry int) *big.Int {
 	return new(big.Int).Mod(sum, hashMod)
 }
 
+func between(start, elt, end *big.Int, inclusive bool) bool {
+	if end.Cmp(start) > 0 {
+		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
+	} else {
+		return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
+	}
+}
+
 func getLocalAddress() string {
 	var localaddress string
 
@@ -70,23 +78,36 @@ func getLocalAddress() string {
 	return localaddress
 }
 
+func call(address string, method string, request interface{}, reply interface{}) error {
+	client, err := rpc.DialHTTP("tcp", address)
+	if err != nil {
+		log.Printf("rpc.DialHTTP: %v", err)
+		return err
+	}
+	defer client.Close()
+	return client.Call("Node."+method, request, reply)
+}
+
 //End of Ross code
 
 func helpCommand() {
-	fmt.Println("help:              Displays a list of commands", "\n")
-	fmt.Println("port <n>:          Sets the port this node should listen on", "\n")
-	fmt.Println("create:            Creates a new ring if no ring has been joined or exists", "\n")
-	fmt.Println("join <address>:    Joins an existing ring at the specified address", "\n")
-	fmt.Println("put <key> <value>: Inserts a key/value pair into the active ring", "\n")
-	fmt.Println("putrandom <n>:     Randomly generates n keys and associated values and stores them on the ring", "\n")
-	fmt.Println("get <key>:         Find the given key on the ring and return its value", "\n")
-	fmt.Println("delete <key>:      Deletes the given key from the ring", "\n")
-	fmt.Println("dump:              Display info about current node", "\n")
+	fmt.Println("help:              Displays a list of commands")
+	fmt.Println("port <n>:          Sets the port this node should listen on")
+	fmt.Println("create:            Creates a new ring if no ring has been joined or exists")
+	fmt.Println("join <address>:    Joins an existing ring at the specified address")
+	fmt.Println("put <key> <value>: Inserts a key/value pair into the active ring")
+	fmt.Println("putrandom <n>:     Randomly generates n keys and associated values and stores them on the ring")
+	fmt.Println("get <key>:         Find the given key on the ring and return its value")
+	fmt.Println("delete <key>:      Deletes the given key from the ring")
+	fmt.Println("dump:              Display info about current node")
 	fmt.Println("quit:              Ends the program")
 }
 
 type Node struct {
-	Address string
+	Address   string
+	Port      string
+	Successor string
+	Bucket    map[string]string
 }
 
 func create(node *Node, portNumber string) error {
@@ -100,10 +121,12 @@ func create(node *Node, portNumber string) error {
 }
 
 func allCommands() {
+	existingRing := false
 	port := ":3410"
 
 	node := Node{
-		Address: getLocalAddress() + port,
+		Address:   getLocalAddress() + port,
+		Successor: getLocalAddress() + port,
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -119,10 +142,20 @@ func allCommands() {
 				fmt.Println("Your port number: ")
 			}
 		case "create":
-			create(&node, port)
-			fmt.Println("You created a new ring")
-			fmt.Println("Listening")
+			if existingRing == false {
+				create(&node, port)
+				existingRing = true
+				fmt.Println("You created a new ring")
+				fmt.Println("Listening on port")
+			} else {
+				println("Ring already exists")
+			}
+
 		case "join":
+			if len(userCommand) == 2 {
+				create(&node, port)
+				existingRing = true
+			}
 			fmt.Println("You joined a ring")
 		case "put":
 			fmt.Println("You put something on the ring")
