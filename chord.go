@@ -105,15 +105,16 @@ func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	return nil
 }
 
-// func (elt *Node) Get(key string, value string) error {
-// 	// log.Printf("getting data from %s", elt.Address)
-// 	if val, ok := elt.Bucket[key]; ok {
-// 		value = val
-// 		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
-// 		return nil
-// 	}
-// 	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
-// }
+func (n *Node) Get(key string, value *string) error {
+	// log.Printf("getting data from %s", elt.Address)
+	fmt.Println("Got in get")
+	if val, ok := n.Bucket[key]; ok {
+		*value = val
+		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
+		return nil
+	}
+	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
+}
 
 // func (elt *Node) Dump(empty1 *struct{}, info *Node) error {
 // 	info.Address = elt.Address
@@ -197,14 +198,8 @@ func allCommands() {
 			helpCommand()
 		case "port":
 			if len(userCommand) == 2 {
-<<<<<<< HEAD
 				port = ":" + userCommand[1]
 				fmt.Println("Your port number: ", port)
-=======
-				newPort := userCommand[1]
-				node.Address = getLocalAddress() + ":" + newPort
-				fmt.Println("Your port number: ", newPort)
->>>>>>> d1262b4d35ed3d9f1020e9b5e86f42c100a79713
 			}
 		case "create":
 			if existingRing == false {
@@ -246,7 +241,7 @@ func allCommands() {
 			}
 		case "put":
 			if existingRing == true {
-				if len(userCommand) == 3 {
+				if len(userCommand) == 4 {
 					// key := userCommand[1]
 					// keyval := userCommand[2]
 					// node.Bucket[key] = keyval
@@ -261,14 +256,20 @@ func allCommands() {
 			fmt.Println("You put random crap on the ring")
 		case "get":
 			if existingRing == true {
-				// if len(userCommand) == 2 {
-				// 	keyval := KeyValue(userCommand[1], "")
-				// 	call(userCommand[1], "Get", userCommand[2])
-				// }
+				if len(userCommand) == 3 {
+					fmt.Println("Right before the call")
+					call(userCommand[1], "Get", userCommand[2], node.Bucket[userCommand[2]])
+				} else {
+					fmt.Println("This didnt work")
+				}
 			}
-			fmt.Println("You get something on the ring")
 		case "delete":
-			fmt.Println("You deleted something")
+			if existingRing == true {
+				if len(userCommand) == 3 {
+					keyval := KeyValue{userCommand[2], ""}
+					call(userCommand[1], "Delete", keyval, node)
+				}
+			}
 		case "dump":
 			fmt.Println("Here is your node info")
 		case "quit":
