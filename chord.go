@@ -89,7 +89,7 @@ func call(address string, method string, request interface{}, reply interface{})
 }
 
 func (n *Node) Ping(address string, pingBool *bool) error {
-	fmt.Printf("Ping")
+	*pingBool = true
 	return nil
 }
 
@@ -99,8 +99,8 @@ func (n *Node) Ping(address string, pingBool *bool) error {
 // 	return nil
 // }
 
-func (elt *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
-	elt.Bucket[keyvalue.Key] = keyvalue.Value
+func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
+	n.Bucket[keyvalue.Key] = keyvalue.Value
 	log.Printf("\t%s was added to this node", *keyvalue)
 	return nil
 }
@@ -196,7 +196,7 @@ func allCommands() {
 		case "port":
 			if len(userCommand) == 2 {
 				port = userCommand[1]
-				fmt.Println("Your port number: ")
+				fmt.Println("Your port number: ", port)
 			}
 		case "create":
 			if existingRing == false {
@@ -223,25 +223,36 @@ func allCommands() {
 			if existingRing == true {
 				if len(userCommand) == 2 {
 					pingBool := false
-					call(node.Address, "ping", userCommand[1], &pingBool)
+					call(node.Address, "Ping", userCommand[1], &pingBool)
 					if pingBool == true {
 						fmt.Printf("successfully pinged '%s'", userCommand[1])
+					} else {
+						fmt.Printf("Not work")
 					}
 				}
 			}
 		case "put":
-			fmt.Println("You put something on the ring")
 			if existingRing == true {
 				if len(userCommand) == 3 {
-					key := userCommand[1]
-					keyval := userCommand[2]
-					node.Bucket[key] = keyval
+					// key := userCommand[1]
+					// keyval := userCommand[2]
+					// node.Bucket[key] = keyval
+					keyval := KeyValue{userCommand[2], userCommand[3]}
+					call(userCommand[1], "Put", keyval, "put succesfull")
+					fmt.Println("You put something on the ring")
+				} else {
+					fmt.Printf("no work")
 				}
 			}
 		case "putrandom":
 			fmt.Println("You put random crap on the ring")
 		case "get":
-			// call(elt.find(string(keyvalue.Key)), command, keyvalue.Key, &keyvalue.Value)
+			if existingRing == true {
+				// if len(userCommand) == 2 {
+				// 	keyval := KeyValue(userCommand[1], "")
+				// 	call(userCommand[1], "Get", userCommand[2])
+				// }
+			}
 			fmt.Println("You get something on the ring")
 		case "delete":
 			fmt.Println("You deleted something")
