@@ -105,15 +105,15 @@ func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	return nil
 }
 
-func (elt *Node) Get(key string, value string) error {
-	// log.Printf("getting data from %s", elt.Address)
-	if val, ok := elt.Bucket[key]; ok {
-		value = val
-		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
-		return nil
-	}
-	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
-}
+// func (elt *Node) Get(key string, value string) error {
+// 	// log.Printf("getting data from %s", elt.Address)
+// 	if val, ok := elt.Bucket[key]; ok {
+// 		value = val
+// 		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
+// 		return nil
+// 	}
+// 	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
+// }
 
 // func (elt *Node) Dump(empty1 *struct{}, info *Node) error {
 // 	info.Address = elt.Address
@@ -156,7 +156,7 @@ func helpCommand() {
 
 type Node struct {
 	Address   string
-	Port      string
+	newPort   string
 	Successor string
 	Bucket    map[string]string
 }
@@ -178,12 +178,14 @@ func create(node *Node, portNumber string) error {
 
 func allCommands() {
 	existingRing := false
+
 	port := ":3410"
 
 	node := Node{
 		Address:   getLocalAddress() + port,
 		Successor: getLocalAddress() + port,
 		Bucket:    make(map[string]string),
+		newPort:   port,
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -195,12 +197,12 @@ func allCommands() {
 			helpCommand()
 		case "port":
 			if len(userCommand) == 2 {
-				newPort := userCommand[1]
-				node.Address = getLocalAddress() + ":" + newPort
+				port = ":" + userCommand[1]
 				fmt.Println("Your port number: ", port)
 			}
 		case "create":
 			if existingRing == false {
+				fmt.Println(port)
 				create(&node, port)
 				existingRing = true
 				fmt.Println("You created a new ring")
