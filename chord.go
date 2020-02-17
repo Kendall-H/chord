@@ -88,6 +88,57 @@ func call(address string, method string, request interface{}, reply interface{})
 	return client.Call("Node."+method, request, reply)
 }
 
+func (n *Node) Ping(address string, pingBool *bool) error {
+	fmt.Printf("Ping")
+	return nil
+}
+
+// func (n *Node) Join(address string, successor *string) error {
+// 	*successor = n.find(address)
+// 	call(*successor, "GetAll", address, &struct{}{})
+// 	return nil
+// }
+
+func (elt *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
+	elt.Bucket[keyvalue.Key] = keyvalue.Value
+	log.Printf("\t%s was added to this node", *keyvalue)
+	return nil
+}
+
+func (elt *Node) Get(key string, value string) error {
+	// log.Printf("getting data from %s", elt.Address)
+	if val, ok := elt.Bucket[key]; ok {
+		value = val
+		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
+		return nil
+	}
+	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
+}
+
+// func (elt *Node) Dump(empty1 *struct{}, info *Node) error {
+// 	info.Address = elt.Address
+// 	info.Predecessor = elt.Predecessor
+// 	info.Successors = elt.Successors
+// 	info.Bucket = elt.Bucket
+// 	var old string
+// 	for i := 0; i < len(elt.Fingers); i++ {
+// 		if old != elt.Fingers[i] {
+// 			info.Fingers = append(info.Fingers, strconv.Itoa(i)+":\t", elt.Fingers[i], "\n\t\t\t")
+// 			old = elt.Fingers[i]
+// 		}
+// 	}
+// 	return nil
+// }
+
+func (elt *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
+	if value, ok := elt.Bucket[keyvalue.Key]; ok {
+		delete(elt.Bucket, keyvalue.Key)
+		log.Printf("\t{%s %s} was removed from this node", keyvalue.Key, value)
+		return nil
+	}
+	return fmt.Errorf("\tKey '%s' does not exist in ring", keyvalue.Key)
+}
+
 //End of Ross code
 
 func helpCommand() {
@@ -110,6 +161,11 @@ type Node struct {
 	Bucket    map[string]string
 }
 
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
 func create(node *Node, portNumber string) error {
 	go func() {
 		rpc.Register(node)
@@ -127,6 +183,7 @@ func allCommands() {
 	node := Node{
 		Address:   getLocalAddress() + port,
 		Successor: getLocalAddress() + port,
+		Bucket:    make(map[string]string),
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -146,22 +203,45 @@ func allCommands() {
 				create(&node, port)
 				existingRing = true
 				fmt.Println("You created a new ring")
-				fmt.Println("Listening on port")
+				fmt.Println("Listening on", node.Address)
 			} else {
 				println("Ring already exists")
 			}
 
 		case "join":
-			if len(userCommand) == 2 {
-				create(&node, port)
-				existingRing = true
-			}
+			// if len(userCommand) == 2 {
+			// 	create(&node, port)
+			// 	existingRing = true
+			// 	err := call(commands[1], "Join", node.Address, &successor)
+			// 	if err == nil {
+			// 		log.Printf("\tSetting successor to '%s'", successor)
+			// 		node.Successors[0] = successor
+			// 	}
+			// }
 			fmt.Println("You joined a ring")
+		case "ping":
+			if existingRing == true {
+				if len(userCommand) == 2 {
+					pingBool := false
+					call(node.Address, "ping", userCommand[1], &pingBool)
+					if pingBool == true {
+						fmt.Printf("successfully pinged '%s'", userCommand[1])
+					}
+				}
+			}
 		case "put":
 			fmt.Println("You put something on the ring")
+			if existingRing == true {
+				if len(userCommand) == 3 {
+					key := userCommand[1]
+					keyval := userCommand[2]
+					node.Bucket[key] = keyval
+				}
+			}
 		case "putrandom":
 			fmt.Println("You put random crap on the ring")
 		case "get":
+			// call(elt.find(string(keyvalue.Key)), command, keyvalue.Key, &keyvalue.Value)
 			fmt.Println("You get something on the ring")
 		case "delete":
 			fmt.Println("You deleted something")
