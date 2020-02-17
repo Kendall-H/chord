@@ -197,8 +197,14 @@ func allCommands() {
 			helpCommand()
 		case "port":
 			if len(userCommand) == 2 {
+<<<<<<< HEAD
 				port = ":" + userCommand[1]
 				fmt.Println("Your port number: ", port)
+=======
+				newPort := userCommand[1]
+				node.Address = getLocalAddress() + ":" + newPort
+				fmt.Println("Your port number: ", newPort)
+>>>>>>> d1262b4d35ed3d9f1020e9b5e86f42c100a79713
 			}
 		case "create":
 			if existingRing == false {
