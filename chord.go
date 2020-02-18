@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-//Ross Code
-
 //Returns a sha1 hash value
 func hashString(elt string) *big.Int {
 	hasher := sha1.New()
@@ -74,7 +72,6 @@ func getLocalAddress() string {
 	if localaddress == "" {
 		panic("init: failed to find non-loopback interface with valid address on this node")
 	}
-
 	return localaddress
 }
 
@@ -95,7 +92,6 @@ func (n *Node) Ping(address string, pingBool *bool) error {
 
 func (n *Node) Join(address string, successor *string) error {
 	*successor = n.Address
-	// call(*successor, "Ping", address, &struct{}{})
 	return nil
 }
 
@@ -105,8 +101,8 @@ func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	return nil
 }
 
+//gets a value with given key
 func (n *Node) Get(key string, value *string) error {
-	// log.Printf("getting data from %s", elt.Address)
 	fmt.Println("Got in get")
 	if val, ok := n.Bucket[key]; ok {
 		*value = val
@@ -116,31 +112,14 @@ func (n *Node) Get(key string, value *string) error {
 	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
 }
 
-// func (elt *Node) Dump(empty1 *struct{}, info *Node) error {
-// 	info.Address = elt.Address
-// 	info.Predecessor = elt.Predecessor
-// 	info.Successors = elt.Successors
-// 	info.Bucket = elt.Bucket
-// 	var old string
-// 	for i := 0; i < len(elt.Fingers); i++ {
-// 		if old != elt.Fingers[i] {
-// 			info.Fingers = append(info.Fingers, strconv.Itoa(i)+":\t", elt.Fingers[i], "\n\t\t\t")
-// 			old = elt.Fingers[i]
-// 		}
-// 	}
-// 	return nil
-// }
-
-func (elt *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
-	if value, ok := elt.Bucket[keyvalue.Key]; ok {
-		delete(elt.Bucket, keyvalue.Key)
+func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
+	if value, ok := n.Bucket[keyvalue.Key]; ok {
+		delete(n.Bucket, keyvalue.Key)
 		log.Printf("\t{%s %s} was removed from this node", keyvalue.Key, value)
 		return nil
 	}
 	return fmt.Errorf("\tKey '%s' does not exist in ring", keyvalue.Key)
 }
-
-//End of Ross code
 
 func helpCommand() {
 	fmt.Println("help:              Displays a list of commands")
@@ -211,7 +190,6 @@ func allCommands() {
 			} else {
 				println("Ring already exists")
 			}
-
 		case "join":
 			if existingRing == false {
 				if len(userCommand) == 2 {
@@ -247,9 +225,6 @@ func allCommands() {
 		case "put":
 			if existingRing == true {
 				if len(userCommand) == 4 {
-					// key := userCommand[1]
-					// keyval := userCommand[2]
-					// node.Bucket[key] = keyval
 					keyval := KeyValue{userCommand[2], userCommand[3]}
 					call(userCommand[1], "Put", keyval, "put succesfull")
 					fmt.Println("You put something on the ring")
