@@ -93,11 +93,11 @@ func (n *Node) Ping(address string, pingBool *bool) error {
 	return nil
 }
 
-// func (n *Node) Join(address string, successor *string) error {
-// 	*successor = n.find(address)
-// 	call(*successor, "GetAll", address, &struct{}{})
-// 	return nil
-// }
+func (n *Node) Join(address string, successor *string) error {
+	*successor = n.Address
+	// call(*successor, "Ping", address, &struct{}{})
+	return nil
+}
 
 func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	n.Bucket[keyvalue.Key] = keyvalue.Value
@@ -190,7 +190,7 @@ func allCommands() {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Please enter a command:")
+	fmt.Println("Please enter a command fool:")
 	for scanner.Scan() {
 		userCommand := strings.Split(scanner.Text(), " ")
 		switch userCommand[0] {
@@ -213,16 +213,21 @@ func allCommands() {
 			}
 
 		case "join":
-			// if len(userCommand) == 2 {
-			// 	create(&node, port)
-			// 	existingRing = true
-			// 	err := call(commands[1], "Join", node.Address, &successor)
-			// 	if err == nil {
-			// 		log.Printf("\tSetting successor to '%s'", successor)
-			// 		node.Successors[0] = successor
-			// 	}
-			// }
-			fmt.Println("You joined a ring")
+			if existingRing == false {
+				if len(userCommand) == 2 {
+					create(&node, port)
+					existingRing = true
+					var successor string
+					err := call(userCommand[1], "Join", node.Address, &successor)
+					if err == nil {
+						node.Successor = successor
+					} else {
+						fmt.Println(err)
+					}
+					fmt.Println(node.Address)
+					fmt.Println(node.Successor)
+				}
+			}
 		case "ping":
 			if existingRing == true {
 				if len(userCommand) == 2 {
@@ -271,7 +276,14 @@ func allCommands() {
 				}
 			}
 		case "dump":
-			fmt.Println("Here is your node info")
+			if existingRing == true {
+				fmt.Println("This is working")
+				fmt.Println("Node address: " + node.Address)
+				fmt.Println("Node Successor " + node.Successor)
+				for i := range node.Bucket {
+					fmt.Println(i + " : " + node.Bucket[i])
+				}
+			}
 		case "quit":
 			fmt.Println("You quit")
 			os.Exit(3)
@@ -279,7 +291,6 @@ func allCommands() {
 			fmt.Println("not a valid command")
 		}
 	}
-
 }
 
 func main() {
