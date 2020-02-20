@@ -197,13 +197,12 @@ func allCommands() {
 					existingRing = true
 					var successor string
 					err := call(userCommand[1], "Join", node.Address, &successor)
+					fmt.Println("You have joined: ", node.Address)
 					if err == nil {
 						node.Successor = successor
 					} else {
 						fmt.Println(err)
 					}
-					fmt.Println(node.Address)
-					fmt.Println(node.Successor)
 				}
 			}
 		case "ping":
