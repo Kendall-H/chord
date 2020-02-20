@@ -101,7 +101,6 @@ func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	return nil
 }
 
-//gets a value with given key
 func (n *Node) Get(key string, value *string) error {
 	fmt.Println("Got in get")
 	if val, ok := n.Bucket[key]; ok {
@@ -121,6 +120,59 @@ func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 	return fmt.Errorf("\tKey '%s' does not exist in ring", keyvalue.Key)
 }
 
+func (n *Node) stabilize() error {
+	return nil
+}
+
+func (n *Node) Notify(address string, empty *struct{}) error {
+	if n.Predecessor == "" ||
+		between(hashString(n.Predecessor), hashString(address), hashString(n.Address), false) {
+		n.Predecessor = address
+	}
+	return nil
+}
+
+func (n *Node) closestPreceedingNode(id *big.Int) string {
+	for i := len(n.FingerTable) - 1; i > 0; i-- {
+		if between(hashString(n.Address), hashString(n.FingerTable[i]), id, false) {
+			return n.FingerTable[i]
+		}
+	}
+	return n.Successors[0]
+}
+
+func (n *Node) FindSucessor(hash *big.Int, nextNode *NextNode) error {
+	if between(hashString(n.Address), hash, hashString(n.Successors[0]), true) {
+		nextNode.Address = n.Successors[0]
+		return nil
+	}
+	nextNode.Address = n.closestPreceedingNode(hash)
+	return nil
+}
+
+func (n *Node) find(key string) string {
+	nextNode := NextNode{
+		Address: "",
+	}
+	nextNode.Address = n.Successors[0]
+	found := false
+	count := 32
+	for !found {
+		if count > 0 {
+			//log.Printf("find is calling FindSuccessor")
+			err := call(nextNode.Address, "FindSucessor", hashString(key), &nextNode)
+			if err == nil {
+				count--
+			} else {
+				count = 0
+			}
+		} else {
+			return ""
+		}
+	}
+	return nextNode.Address
+}
+
 func helpCommand() {
 	fmt.Println("help:              Displays a list of commands")
 	fmt.Println("port <n>:          Sets the port this node should listen on")
@@ -135,15 +187,20 @@ func helpCommand() {
 }
 
 type Node struct {
-	Address   string
-	newPort   string
-	Successor string
-	Bucket    map[string]string
+	Address     string
+	Predecessor string
+	Successors  [3]string
+	Bucket      map[string]string
+	FingerTable []string
 }
 
 type KeyValue struct {
 	Key   string
 	Value string
+}
+
+type NextNode struct {
+	Address string
 }
 
 func create(node *Node, portNumber string) error {
@@ -162,10 +219,11 @@ func allCommands() {
 	port := ":3410"
 
 	node := Node{
-		Address:   getLocalAddress() + port,
-		Successor: getLocalAddress() + port,
-		Bucket:    make(map[string]string),
-		newPort:   port,
+		Address:     getLocalAddress() + port,
+		Predecessor: "",
+		Successors:  [3]string{getLocalAddress() + port},
+		Bucket:      make(map[string]string),
+		FingerTable: make([]string, 161),
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -196,10 +254,13 @@ func allCommands() {
 					create(&node, port)
 					existingRing = true
 					var successor string
+					log.Printf("This is the node.Address" + node.Address)
 					err := call(userCommand[1], "Join", node.Address, &successor)
-					fmt.Println("You have joined: ", node.Address)
 					if err == nil {
-						node.Successor = successor
+						// log.Printf("Port #:" + port)
+						// log.Printf("Successor set to" + successor)
+						// log.Printf("This is your address: " + node.Address)
+						node.Successors[0] = successor
 					} else {
 						fmt.Println(err)
 					}
@@ -253,7 +314,7 @@ func allCommands() {
 			if existingRing == true {
 				fmt.Println("This is working")
 				fmt.Println("Node address: " + node.Address)
-				fmt.Println("Node Successor " + node.Successor)
+				// fmt.Println("Node Successor " + node.Successors)
 				for i := range node.Bucket {
 					fmt.Println(i + " : " + node.Bucket[i])
 				}
