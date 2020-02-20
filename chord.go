@@ -15,9 +15,9 @@ import (
 )
 
 //Returns a sha1 hash value
-func hashString(elt string) *big.Int {
+func hashString(n string) *big.Int {
 	hasher := sha1.New()
-	hasher.Write([]byte(elt))
+	hasher.Write([]byte(n))
 	return new(big.Int).SetBytes(hasher.Sum(nil))
 }
 
@@ -35,11 +35,11 @@ func jump(address string, fingerentry int) *big.Int {
 	return new(big.Int).Mod(sum, hashMod)
 }
 
-func between(start, elt, end *big.Int, inclusive bool) bool {
+func between(start, n, end *big.Int, inclusive bool) bool {
 	if end.Cmp(start) > 0 {
-		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
+		return (start.Cmp(n) < 0 && n.Cmp(end) < 0) || (inclusive && n.Cmp(end) == 0)
 	} else {
-		return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
+		return start.Cmp(n) < 0 || n.Cmp(end) < 0 || (inclusive && n.Cmp(end) == 0)
 	}
 }
 
@@ -52,9 +52,9 @@ func getLocalAddress() string {
 	}
 
 	// find the first non-loopback interface with an IP address
-	for _, elt := range ifaces {
-		if elt.Flags&net.FlagLoopback == 0 && elt.Flags&net.FlagUp != 0 {
-			addrs, err := elt.Addrs()
+	for _, n := range ifaces {
+		if n.Flags&net.FlagLoopback == 0 && n.Flags&net.FlagUp != 0 {
+			addrs, err := n.Addrs()
 			if err != nil {
 				panic("init: failed to get addresses for network interface")
 			}
@@ -173,6 +173,34 @@ func (n *Node) find(key string) string {
 	return nextNode.Address
 }
 
+func (n *Node) fixFingers() error {
+	n.Next++
+	if n.Next > len(n.FingerTable)-1 {
+		n.Next = 0
+	}
+	//log.Printf("fixFingers is calling findHash")
+	addrs := n.findHash(n.jump(n.Next))
+
+	if n.FingerTable[n.Next] != addrs && addrs != "" {
+		log.Printf("\tWriting FingerTable entry '%d' as '%s'\n", n.Next, addrs)
+		n.FingerTable[n.Next] = addrs
+	}
+	for {
+		n.Next++
+		if n.Next > len(n.FingerTable)-1 {
+			n.Next = 0
+			return nil
+		}
+
+		if between(hashString(n.Address), n.jump(n.Next), hashString(addrs), false) && addrs != "" {
+			n.FingerTable[n.Next] = addrs
+		} else {
+			n.Next--
+			return nil
+		}
+	}
+}
+
 func helpCommand() {
 	fmt.Println("help:              Displays a list of commands")
 	fmt.Println("port <n>:          Sets the port this node should listen on")
@@ -192,6 +220,7 @@ type Node struct {
 	Successors  [3]string
 	Bucket      map[string]string
 	FingerTable []string
+	Next        int
 }
 
 type KeyValue struct {
@@ -224,6 +253,7 @@ func allCommands() {
 		Successors:  [3]string{getLocalAddress() + port},
 		Bucket:      make(map[string]string),
 		FingerTable: make([]string, 161),
+		Next:		 0
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
