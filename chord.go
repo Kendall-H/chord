@@ -121,6 +121,38 @@ func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 }
 
 func (n *Node) stabilize() error {
+	println("Stabilize")
+	var successors []string
+	err := call(n.Successors[0], "GetSuccessorList", &struct{}{}, &successors)
+	if err == nil {
+		n.Successors[1] = successors[0]
+		n.Successors[2] = successors[1]
+	} else {
+		log.Printf("\tPrimary successor '%s' failed", n.Successors[0])
+		if n.Successors[0] == "" {
+			log.Printf("\tSetting primary successor to address of this node '%s'", n.Address)
+			n.Successors[0] = n.Address
+		} else {
+			log.Printf("\tSetting secondary successor '%s' as primary ", n.Successors[1])
+			n.Successors[0] = n.Successors[1]
+			n.Successors[1] = n.Successors[2]
+			n.Successors[2] = ""
+		}
+	}
+	x := ""
+	call(n.Successors[0], "GetPredecessor", &struct{}{}, &x)
+
+	if between(hashString(n.Address),
+		hashString(x),
+		hashString(n.Successors[0]),
+		false) && x != "" {
+		log.Printf("\tSetting primary successor to '%s'", x)
+		n.Successors[0] = x
+	}
+
+	err = call(n.Successors[0], "Notify", n.Address, &struct{}{})
+	if err != nil {
+	}
 	return nil
 }
 
@@ -141,7 +173,7 @@ func (n *Node) closestPreceedingNode(id *big.Int) string {
 	return n.Successors[0]
 }
 
-func (n *Node) FindSucessor(hash *big.Int, nextNode *NextNode) error {
+func (n *Node) FindSuccessor(hash *big.Int, nextNode *NextNode) error {
 	if between(hashString(n.Address), hash, hashString(n.Successors[0]), true) {
 		nextNode.Address = n.Successors[0]
 		return nil
@@ -160,7 +192,7 @@ func (n *Node) find(key string) string {
 	for !found {
 		if count > 0 {
 			//log.Printf("find is calling FindSuccessor")
-			err := call(nextNode.Address, "FindSucessor", hashString(key), &nextNode)
+			err := call(nextNode.Address, "FindSuccessor", hashString(key), &nextNode)
 			if err == nil {
 				count--
 			} else {
@@ -174,12 +206,14 @@ func (n *Node) find(key string) string {
 }
 
 func (n *Node) fixFingers() error {
+	println("running fixFin")
 	n.Next++
 	if n.Next > len(n.FingerTable)-1 {
 		n.Next = 0
 	}
-	//log.Printf("fixFingers is calling findHash")
-	addrs := n.findHash(n.jump(n.Next))
+	bigInt := jump(n.Address, n.Next)
+	bigString := bigInt.String()
+	addrs := n.find(bigString)
 
 	if n.FingerTable[n.Next] != addrs && addrs != "" {
 		log.Printf("\tWriting FingerTable entry '%d' as '%s'\n", n.Next, addrs)
@@ -192,13 +226,28 @@ func (n *Node) fixFingers() error {
 			return nil
 		}
 
-		if between(hashString(n.Address), n.jump(n.Next), hashString(addrs), false) && addrs != "" {
+		if between(hashString(n.Address), jump(n.Address, n.Next), hashString(addrs), false) && addrs != "" {
 			n.FingerTable[n.Next] = addrs
 		} else {
 			n.Next--
 			return nil
 		}
 	}
+}
+
+func (n *Node) checkPredecessor() error {
+	log.Println("Running checkPred")
+	if n.Predecessor != "" {
+		client, err := rpc.DialHTTP("tcp", n.Predecessor)
+		if err != nil {
+			log.Printf("\tPredecessor '%s' has failed", n.Predecessor)
+			n.Predecessor = ""
+			//n.Successors[0] = n.Address
+		} else {
+			client.Close()
+		}
+	}
+	return nil
 }
 
 func helpCommand() {
@@ -253,8 +302,20 @@ func allCommands() {
 		Successors:  [3]string{getLocalAddress() + port},
 		Bucket:      make(map[string]string),
 		FingerTable: make([]string, 161),
-		Next:		 0
+		Next:        0,
 	}
+
+	go func() {
+		for {
+			if existingRing {
+				node.stabilize()
+				node.fixFingers()
+				node.checkPredecessor()
+			}
+			time.Sleep(time.Second)
+
+		}
+	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Please enter a command fool:")
@@ -360,5 +421,4 @@ func allCommands() {
 
 func main() {
 	allCommands()
-
 }
