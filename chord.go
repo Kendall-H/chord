@@ -420,10 +420,10 @@ func main() {
 			}
 		case "put":
 			if existingRing == true {
-				if len(userCommand) == 4 {
-					keyval := KeyValue{userCommand[2], userCommand[3]}
-					call(userCommand[1], "Put", keyval, "put succesfull")
-					fmt.Println("You put something on the ring")
+				if len(userCommand) == 3 {
+					keyval := KeyValue{userCommand[1], userCommand[2]}
+					call(node.find(string(userCommand[1])), "Put", keyval, "put succesfull")
+					fmt.Println("You put", keyval.Key, " on the ring")
 				} else {
 					fmt.Printf("no work")
 				}
@@ -432,9 +432,11 @@ func main() {
 			fmt.Println("You put random crap on the ring")
 		case "get":
 			if existingRing == true {
-				if len(userCommand) == 3 {
+				if len(userCommand) == 2 {
+					item := KeyValue{userCommand[1], ""}
 					fmt.Println("Right before the call")
-					call(userCommand[1], "Get", userCommand[2], node.Bucket[userCommand[2]])
+					call(node.find(string(userCommand[1])), "Get", userCommand[1], &item)
+					fmt.Println("value of key ", item.Key, "is", item.Value)
 				} else {
 					fmt.Println("This didnt work")
 				}
