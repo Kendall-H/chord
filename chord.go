@@ -91,7 +91,7 @@ func (n *Node) Ping(address string, pingBool *bool) error {
 }
 
 func (n *Node) Join(address string, successor *string) error {
-	*successor = n.Address
+	*successor = n.find(address)
 	return nil
 }
 
@@ -123,7 +123,9 @@ func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 func (n *Node) stabilize() error {
 	println("Stabilize")
 	var successors []string
-	err := call(n.Successors[0], "GetSuccessorList", &struct{}{}, &successors)
+	fmt.Println("successor[0] " + n.Successors[0])
+	err := call(n.Successors[0], "GetSuccessors", &struct{}{}, &successors)
+	//fmt.Println(&successors)
 	if err == nil {
 		n.Successors[1] = successors[0]
 		n.Successors[2] = successors[1]
@@ -156,6 +158,13 @@ func (n *Node) stabilize() error {
 	return nil
 }
 
+func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
+	fmt.Println("In get successors function")
+	*successors = n.Successors[:]
+	//print(&successors)
+	return nil
+}
+
 func (n *Node) Notify(address string, empty *struct{}) error {
 	if n.Predecessor == "" ||
 		between(hashString(n.Predecessor), hashString(address), hashString(n.Address), false) {
@@ -176,6 +185,7 @@ func (n *Node) closestPreceedingNode(id *big.Int) string {
 func (n *Node) FindSuccessor(hash *big.Int, nextNode *NextNode) error {
 	if between(hashString(n.Address), hash, hashString(n.Successors[0]), true) {
 		nextNode.Address = n.Successors[0]
+		nextNode.Found = true
 		return nil
 	}
 	nextNode.Address = n.closestPreceedingNode(hash)
@@ -185,11 +195,11 @@ func (n *Node) FindSuccessor(hash *big.Int, nextNode *NextNode) error {
 func (n *Node) find(key string) string {
 	nextNode := NextNode{
 		Address: "",
+		Found:   false,
 	}
 	nextNode.Address = n.Successors[0]
-	found := false
 	count := 32
-	for !found {
+	for !nextNode.Found {
 		if count > 0 {
 			//log.Printf("find is calling FindSuccessor")
 			err := call(nextNode.Address, "FindSuccessor", hashString(key), &nextNode)
@@ -279,6 +289,7 @@ type KeyValue struct {
 
 type NextNode struct {
 	Address string
+	Found   bool
 }
 
 func create(node *Node, portNumber string) error {
@@ -309,8 +320,8 @@ func allCommands() {
 		for {
 			if existingRing {
 				node.stabilize()
-				node.fixFingers()
-				node.checkPredecessor()
+				//node.fixFingers()
+				//node.checkPredecessor()
 			}
 			time.Sleep(time.Second)
 
@@ -328,6 +339,7 @@ func allCommands() {
 			if len(userCommand) == 2 {
 				port = ":" + userCommand[1]
 				fmt.Println("Your port number: ", port)
+				node.Address = getLocalAddress() + port
 			}
 		case "create":
 			if existingRing == false {
@@ -345,7 +357,7 @@ func allCommands() {
 					create(&node, port)
 					existingRing = true
 					var successor string
-					log.Printf("This is the node.Address" + node.Address)
+					log.Printf("This is the node.Address " + node.Address)
 					err := call(userCommand[1], "Join", node.Address, &successor)
 					if err == nil {
 						// log.Printf("Port #:" + port)
