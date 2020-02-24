@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -54,12 +55,12 @@ func getLocalAddress() string {
 	// find the first non-loopback interface with an IP address
 	for _, n := range ifaces {
 		if n.Flags&net.FlagLoopback == 0 && n.Flags&net.FlagUp != 0 {
-			addrs, err := n.Addrs()
+			address, err := n.Addrs()
 			if err != nil {
 				panic("init: failed to get addresses for network interface")
 			}
 
-			for _, addr := range addrs {
+			for _, addr := range address {
 				if ipnet, ok := addr.(*net.IPNet); ok {
 					if ip4 := ipnet.IP.To4(); len(ip4) == net.IPv4len {
 						localaddress = ip4.String()
@@ -120,14 +121,35 @@ func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 	return fmt.Errorf("\tKey '%s' does not exist in ring", keyvalue.Key)
 }
 
+func (n *Node) Dump(empty1 *struct{}, dumpN *Node) error {
+	dumpN.Address = n.Address
+	dumpN.Predecessor = n.Predecessor
+	dumpN.Successors = n.Successors
+	dumpN.Bucket = n.Bucket
+	var old string
+	for i := 0; i < len(n.FingerTable); i++ {
+		if old != n.FingerTable[i] {
+			dumpN.FingerTable = append(dumpN.FingerTable, strconv.Itoa(i)+":\t", n.FingerTable[i], "\n\t\t\t")
+			old = n.FingerTable[i]
+		}
+	}
+	return nil
+}
+
 func (n *Node) stabilize() error {
-	println("Stabilize")
+	//println("Stabilize")
 	var successors []string
-	fmt.Println("successor[0] " + n.Successors[0])
+	//fmt.Println("successor[0] " + n.Successors[0])
 	err := call(n.Successors[0], "GetSuccessors", &struct{}{}, &successors)
 	//fmt.Println(&successors)
 	if err == nil {
+		// fmt.Println("got here")
+		// fmt.Println(n.Successors[0])
+		// fmt.Println(n.Successors[1])
+
 		n.Successors[1] = successors[0]
+		// fmt.Println(n.Successors[0])
+		// fmt.Println(n.Successors[1])
 		n.Successors[2] = successors[1]
 	} else {
 		log.Printf("\tPrimary successor '%s' failed", n.Successors[0])
@@ -158,10 +180,15 @@ func (n *Node) stabilize() error {
 	return nil
 }
 
+func (n *Node) GetPredecessor(empty1 *struct{}, predecessor *string) error {
+	*predecessor = n.Predecessor
+	return nil
+}
+
 func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
-	fmt.Println("In get successors function")
+	//fmt.Println("In get successors function")
 	*successors = n.Successors[:]
-	//print(&successors)
+	//fmt.Println("succesor list: ", n.Successors[:])
 	return nil
 }
 
@@ -216,18 +243,19 @@ func (n *Node) find(key string) string {
 }
 
 func (n *Node) fixFingers() error {
-	println("running fixFin")
+	//println("running fixFin")
 	n.Next++
 	if n.Next > len(n.FingerTable)-1 {
 		n.Next = 0
 	}
 	bigInt := jump(n.Address, n.Next)
 	bigString := bigInt.String()
-	addrs := n.find(bigString)
 
-	if n.FingerTable[n.Next] != addrs && addrs != "" {
-		log.Printf("\tWriting FingerTable entry '%d' as '%s'\n", n.Next, addrs)
-		n.FingerTable[n.Next] = addrs
+	address := n.find(bigString)
+
+	if n.FingerTable[n.Next] != address && address != "" {
+		log.Printf("\tWriting FingerTable entry '%d' as '%s'\n", n.Next, address)
+		n.FingerTable[n.Next] = address
 	}
 	for {
 		n.Next++
@@ -236,8 +264,8 @@ func (n *Node) fixFingers() error {
 			return nil
 		}
 
-		if between(hashString(n.Address), jump(n.Address, n.Next), hashString(addrs), false) && addrs != "" {
-			n.FingerTable[n.Next] = addrs
+		if between(hashString(n.Address), jump(n.Address, n.Next), hashString(address), false) && address != "" {
+			n.FingerTable[n.Next] = address
 		} else {
 			n.Next--
 			return nil
@@ -246,7 +274,7 @@ func (n *Node) fixFingers() error {
 }
 
 func (n *Node) checkPredecessor() error {
-	log.Println("Running checkPred")
+	//log.Println("Running checkPred")
 	if n.Predecessor != "" {
 		client, err := rpc.DialHTTP("tcp", n.Predecessor)
 		if err != nil {
@@ -266,10 +294,10 @@ func helpCommand() {
 	fmt.Println("create:            Creates a new ring if no ring has been joined or exists")
 	fmt.Println("join <address>:    Joins an existing ring at the specified address")
 	fmt.Println("put <key> <value>: Inserts a key/value pair into the active ring")
-	fmt.Println("putrandom <n>:     Randomly generates n keys and associated values and stores them on the ring")
+	fmt.Println("putrandom <n>:     Randomly generates n keys and associated thisDumpNode and stores them on the ring")
 	fmt.Println("get <key>:         Find the given key on the ring and return its value")
 	fmt.Println("delete <key>:      Deletes the given key from the ring")
-	fmt.Println("dump:              Display info about current node")
+	fmt.Println("dump:              Display dumpN about current node")
 	fmt.Println("quit:              Ends the program")
 }
 
@@ -303,6 +331,11 @@ func create(node *Node, portNumber string) error {
 }
 
 func allCommands() {
+
+}
+
+func main() {
+	//allCommands()
 	existingRing := false
 
 	port := ":3410"
@@ -319,9 +352,9 @@ func allCommands() {
 	go func() {
 		for {
 			if existingRing {
+				node.checkPredecessor()
 				node.stabilize()
-				//node.fixFingers()
-				//node.checkPredecessor()
+				node.fixFingers()
 			}
 			time.Sleep(time.Second)
 
@@ -417,9 +450,16 @@ func allCommands() {
 			if existingRing == true {
 				fmt.Println("This is working")
 				fmt.Println("Node address: " + node.Address)
-				// fmt.Println("Node Successor " + node.Successors)
-				for i := range node.Bucket {
-					fmt.Println(i + " : " + node.Bucket[i])
+				if len(userCommand) == 1 {
+					var thisDumpNode Node
+					err := call(node.Address, "Dump", &struct{}{}, &thisDumpNode)
+					if err == nil {
+						fmt.Println("Address: 		", thisDumpNode.Address)
+						fmt.Println("Pred: 			", thisDumpNode.Predecessor)
+						fmt.Println("Successors:	", thisDumpNode.Successors)
+						fmt.Println("Bucket: 		", thisDumpNode.Bucket)
+						fmt.Println("FingerTable: 	", thisDumpNode.FingerTable)
+					}
 				}
 			}
 		case "quit":
@@ -429,8 +469,4 @@ func allCommands() {
 			fmt.Println("not a valid command")
 		}
 	}
-}
-
-func main() {
-	allCommands()
 }
