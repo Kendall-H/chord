@@ -79,48 +79,53 @@ func getLocalAddress() string {
 func call(address string, method string, request interface{}, reply interface{}) error {
 	client, err := rpc.DialHTTP("tcp", address)
 	if err != nil {
-		log.Printf("rpc.DialHTTP: %v", err)
+		fmt.Println("rpc broken: ", err)
 		return err
 	}
 	defer client.Close()
 	return client.Call("Node."+method, request, reply)
 }
 
+// Ping : ping nodes
 func (n *Node) Ping(address string, pingBool *bool) error {
 	*pingBool = true
 	return nil
 }
 
+// Join : join ring
 func (n *Node) Join(address string, successor *string) error {
 	*successor = n.find(address)
 	return nil
 }
 
+// Put : put keyval pairs on ring
 func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	n.Bucket[keyvalue.Key] = keyvalue.Value
-	log.Printf("\t%s was added to this node", *keyvalue)
+	fmt.Println(*keyvalue, "was added to this node")
 	return nil
 }
 
+// Get : get keyval pairs
 func (n *Node) Get(key string, value *string) error {
-	fmt.Println("Got in get")
 	if val, ok := n.Bucket[key]; ok {
 		*value = val
-		log.Printf("\t{%s %s} value was retrieved from this node", key, val)
+		//fmt.Println("Got", key, val)
 		return nil
 	}
-	return fmt.Errorf("\tKey '%s' does not exist in ring", key)
+	return fmt.Errorf("Does not exist: ", key)
 }
 
+// Delete : delete keyval pairs
 func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 	if value, ok := n.Bucket[keyvalue.Key]; ok {
 		delete(n.Bucket, keyvalue.Key)
-		log.Printf("\t{%s %s} was removed from this node", keyvalue.Key, value)
+		fmt.Println("Removed: ", keyvalue.Key, value)
 		return nil
 	}
-	return fmt.Errorf("\tKey '%s' does not exist in ring", keyvalue.Key)
+	return fmt.Errorf(keyvalue.Key, "does not exist")
 }
 
+// Dump : show node info
 func (n *Node) Dump(empty1 *struct{}, dumpN *Node) error {
 	dumpN.Address = n.Address
 	dumpN.Predecessor = n.Predecessor
@@ -151,18 +156,8 @@ func (n *Node) stabilize() error {
 		// fmt.Println(n.Successors[0])
 		// fmt.Println(n.Successors[1])
 		n.Successors[2] = successors[1]
-	} else {
-		log.Printf("\tPrimary successor '%s' failed", n.Successors[0])
-		if n.Successors[0] == "" {
-			log.Printf("\tSetting primary successor to address of this node '%s'", n.Address)
-			n.Successors[0] = n.Address
-		} else {
-			log.Printf("\tSetting secondary successor '%s' as primary ", n.Successors[1])
-			n.Successors[0] = n.Successors[1]
-			n.Successors[1] = n.Successors[2]
-			n.Successors[2] = ""
-		}
 	}
+
 	x := ""
 	call(n.Successors[0], "GetPredecessor", &struct{}{}, &x)
 
@@ -170,7 +165,7 @@ func (n *Node) stabilize() error {
 		hashString(x),
 		hashString(n.Successors[0]),
 		false) && x != "" {
-		log.Printf("\tSetting primary successor to '%s'", x)
+		fmt.Println("Primary successor set: ", x)
 		n.Successors[0] = x
 	}
 
@@ -180,11 +175,13 @@ func (n *Node) stabilize() error {
 	return nil
 }
 
+// GetPredecessor : gets predecessor to use
 func (n *Node) GetPredecessor(empty1 *struct{}, predecessor *string) error {
 	*predecessor = n.Predecessor
 	return nil
 }
 
+// GetSuccessors : gets successor list to use
 func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
 	//fmt.Println("In get successors function")
 	*successors = n.Successors[:]
@@ -192,6 +189,7 @@ func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
 	return nil
 }
 
+// Notify : notifies
 func (n *Node) Notify(address string, empty *struct{}) error {
 	if n.Predecessor == "" ||
 		between(hashString(n.Predecessor), hashString(address), hashString(n.Address), false) {
@@ -209,6 +207,7 @@ func (n *Node) closestPreceedingNode(id *big.Int) string {
 	return n.Successors[0]
 }
 
+// FindSuccessor : finds successor
 func (n *Node) FindSuccessor(hash *big.Int, nextNode *NextNode) error {
 	if between(hashString(n.Address), hash, hashString(n.Successors[0]), true) {
 		nextNode.Address = n.Successors[0]
@@ -254,7 +253,7 @@ func (n *Node) fixFingers() error {
 	address := n.find(bigString)
 
 	if n.FingerTable[n.Next] != address && address != "" {
-		log.Printf("\tWriting FingerTable entry '%d' as '%s'\n", n.Next, address)
+		fmt.Println("Putting in FingerTable node", n.Next, "with address", address)
 		n.FingerTable[n.Next] = address
 	}
 	for {
@@ -278,7 +277,7 @@ func (n *Node) checkPredecessor() error {
 	if n.Predecessor != "" {
 		client, err := rpc.DialHTTP("tcp", n.Predecessor)
 		if err != nil {
-			log.Printf("\tPredecessor '%s' has failed", n.Predecessor)
+			fmt.Println("Predecessor failed: ", n.Predecessor)
 			n.Predecessor = ""
 			//n.Successors[0] = n.Address
 		} else {
@@ -301,6 +300,7 @@ func helpCommand() {
 	fmt.Println("quit:              Ends the program")
 }
 
+// Node : our node
 type Node struct {
 	Address     string
 	Predecessor string
@@ -310,11 +310,13 @@ type Node struct {
 	Next        int
 }
 
+// KeyValue : keyval pairs
 type KeyValue struct {
 	Key   string
 	Value string
 }
 
+// NextNode : next node
 type NextNode struct {
 	Address string
 	Found   bool
@@ -331,11 +333,6 @@ func create(node *Node, portNumber string) error {
 }
 
 func allCommands() {
-
-}
-
-func main() {
-	//allCommands()
 	existingRing := false
 
 	port := ":3410"
@@ -371,12 +368,11 @@ func main() {
 		case "port":
 			if len(userCommand) == 2 {
 				port = ":" + userCommand[1]
-				fmt.Println("Your port number: ", port)
+				fmt.Println("Your port number", port)
 				node.Address = getLocalAddress() + port
 			}
 		case "create":
 			if existingRing == false {
-				fmt.Println(port)
 				create(&node, port)
 				existingRing = true
 				fmt.Println("You created a new ring")
@@ -390,12 +386,8 @@ func main() {
 					create(&node, port)
 					existingRing = true
 					var successor string
-					log.Printf("This is the node.Address " + node.Address)
 					err := call(userCommand[1], "Join", node.Address, &successor)
 					if err == nil {
-						// log.Printf("Port #:" + port)
-						// log.Printf("Successor set to" + successor)
-						// log.Printf("This is your address: " + node.Address)
 						node.Successors[0] = successor
 					} else {
 						fmt.Println(err)
@@ -423,9 +415,9 @@ func main() {
 				if len(userCommand) == 3 {
 					keyval := KeyValue{userCommand[1], userCommand[2]}
 					call(node.find(string(userCommand[1])), "Put", keyval, "put succesfull")
-					fmt.Println("You put", keyval.Key, " on the ring")
+					fmt.Println("You put Key:", keyval.Key, "Value:", keyval.Value, "on the ring")
 				} else {
-					fmt.Printf("no work")
+					fmt.Printf("put no work")
 				}
 			}
 		case "putrandom":
@@ -434,18 +426,18 @@ func main() {
 			if existingRing == true {
 				if len(userCommand) == 2 {
 					item := KeyValue{userCommand[1], ""}
-					fmt.Println("Right before the call")
-					call(node.find(string(userCommand[1])), "Get", userCommand[1], &item)
-					fmt.Println("value of key ", item.Key, "is", item.Value)
+					call(node.find(string(userCommand[1])), "Get", userCommand[1], &item.Value)
+					fmt.Println("key:", item.Key, "value:", item.Value)
 				} else {
-					fmt.Println("This didnt work")
+					fmt.Println("Get didnt work")
 				}
 			}
 		case "delete":
 			if existingRing == true {
-				if len(userCommand) == 3 {
-					keyval := KeyValue{userCommand[2], ""}
-					call(userCommand[1], "Delete", keyval, node)
+				if len(userCommand) == 2 {
+					keyval := KeyValue{userCommand[1], ""}
+					call(node.find(string(userCommand[1])), "Delete", keyval, &keyval.Value)
+					fmt.Println("Successfully removed:", keyval.Key, keyval.Value)
 				}
 			}
 		case "dump":
@@ -471,4 +463,8 @@ func main() {
 			fmt.Println("not a valid command")
 		}
 	}
+}
+
+func main() {
+	allCommands()
 }
