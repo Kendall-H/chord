@@ -422,8 +422,8 @@ func main() {
 			if existingRing == true {
 				if len(userCommand) == 3 {
 					keyval := KeyValue{userCommand[1], userCommand[2]}
-					call(node.find(string(userCommand[1])), "Put", keyval, "put succesfull")
-					fmt.Println("You put", keyval.Key, " on the ring")
+					call(node.find(userCommand[1]), "Put", keyval, &struct{}{})
+					fmt.Println("You put", keyval.Key, "on the ring")
 				} else {
 					fmt.Printf("no work")
 				}
@@ -434,9 +434,10 @@ func main() {
 			if existingRing == true {
 				if len(userCommand) == 2 {
 					item := KeyValue{userCommand[1], ""}
-					fmt.Println("Right before the call")
-					call(node.find(string(userCommand[1])), "Get", userCommand[1], &item)
-					fmt.Println("value of key ", item.Key, "is", item.Value)
+					// fmt.Println("Right before the call")
+					call(node.find(userCommand[1]), "Get", item.Key, &item.Value)
+					// fmt.Println(item)
+					fmt.Println("The value at" + "'" + item.Key + "'" + "is" + "'" + item.Value + "'")
 				} else {
 					fmt.Println("This didnt work")
 				}
