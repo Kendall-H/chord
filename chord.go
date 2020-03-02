@@ -151,11 +151,21 @@ func (n *Node) stabilize() error {
 		// fmt.Println("got here")
 		// fmt.Println(n.Successors[0])
 		// fmt.Println(n.Successors[1])
-
 		n.Successors[1] = successors[0]
 		// fmt.Println(n.Successors[0])
 		// fmt.Println(n.Successors[1])
 		n.Successors[2] = successors[1]
+	} else {
+		fmt.Println("Primary successor failed")
+		if n.Successors[0] == "" {
+			fmt.Println("Last exisitng node. Address set to " + n.Address)
+			n.Successors[0] = n.Address
+		} else {
+			fmt.Println("Setting " + n.Successors[1] + " as primary successor")
+			n.Successors[0] = n.Successors[1]
+			n.Successors[1] = n.Successors[2]
+			n.Successors[2] = ""
+		}
 	}
 
 	x := ""
