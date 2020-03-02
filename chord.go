@@ -87,27 +87,23 @@ func call(address string, method string, request interface{}, reply interface{})
 	return client.Call("Node."+method, request, reply)
 }
 
-// Ping : ping nodes
 func (n *Node) Ping(address string, pingBool *bool) error {
 	*pingBool = true
 	return nil
 }
 
-// Join : join ring
 func (n *Node) Join(address string, successor *string) error {
 	*successor = n.find(address)
 	call(*successor, "GetAll", address, &struct{}{})
 	return nil
 }
 
-// Put : put keyval pairs on ring
 func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	n.Bucket[keyvalue.Key] = keyvalue.Value
 	fmt.Println(*keyvalue, "was added to this node")
 	return nil
 }
 
-//Puts all values from current node ito nodes first successor
 func (n *Node) PutAll(bucket map[string]string, empty *struct{}) error {
 	for key, value := range bucket {
 		n.Bucket[key] = value
@@ -115,7 +111,6 @@ func (n *Node) PutAll(bucket map[string]string, empty *struct{}) error {
 	return nil
 }
 
-// Get : get keyval pairs
 func (n *Node) Get(key string, value *string) error {
 	if val, ok := n.Bucket[key]; ok {
 		*value = val
@@ -137,7 +132,6 @@ func (n *Node) GetAll(address string, empty *struct{}) error {
 	return nil
 }
 
-// Delete : delete keyval pairs
 func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 	if value, ok := n.Bucket[keyvalue.Key]; ok {
 		delete(n.Bucket, keyvalue.Key)
@@ -147,7 +141,6 @@ func (n *Node) Delete(keyvalue *KeyValue, empty *struct{}) error {
 	return fmt.Errorf(keyvalue.Key, "does not exist")
 }
 
-// Dump : show node info
 func (n *Node) Dump(empty1 *struct{}, dumpN *Node) error {
 	dumpN.Address = n.Address
 	dumpN.Predecessor = n.Predecessor
@@ -207,13 +200,11 @@ func (n *Node) stabilize() error {
 	return nil
 }
 
-// GetPredecessor : gets predecessor to use
 func (n *Node) GetPredecessor(empty1 *struct{}, predecessor *string) error {
 	*predecessor = n.Predecessor
 	return nil
 }
 
-// GetSuccessors : gets successor list to use
 func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
 	//fmt.Println("In get successors function")
 	*successors = n.Successors[:]
@@ -221,7 +212,6 @@ func (n *Node) GetSuccessors(none *struct{}, successors *[]string) error {
 	return nil
 }
 
-// Notify : notifies
 func (n *Node) Notify(address string, empty *struct{}) error {
 	if n.Predecessor == "" ||
 		between(hashString(n.Predecessor), hashString(address), hashString(n.Address), false) {
@@ -239,7 +229,6 @@ func (n *Node) closestPreceedingNode(id *big.Int) string {
 	return n.Successors[0]
 }
 
-// FindSuccessor : finds successor
 func (n *Node) FindSuccessor(hash *big.Int, nextNode *NextNode) error {
 	if between(hashString(n.Address), hash, hashString(n.Successors[0]), true) {
 		nextNode.Address = n.Successors[0]
@@ -332,7 +321,6 @@ func helpCommand() {
 	fmt.Println("quit:              Ends the program")
 }
 
-// Node : our node
 type Node struct {
 	Address     string
 	Predecessor string
@@ -343,13 +331,11 @@ type Node struct {
 	nodeMutex   sync.Mutex
 }
 
-// KeyValue : keyval pairs
 type KeyValue struct {
 	Key   string
 	Value string
 }
 
-// NextNode : next node
 type NextNode struct {
 	Address string
 	Found   bool
