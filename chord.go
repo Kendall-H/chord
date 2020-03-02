@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -95,6 +96,7 @@ func (n *Node) Ping(address string, pingBool *bool) error {
 // Join : join ring
 func (n *Node) Join(address string, successor *string) error {
 	*successor = n.find(address)
+	call(*successor, "GetAll", address, &struct{}{})
 	return nil
 }
 
@@ -102,6 +104,14 @@ func (n *Node) Join(address string, successor *string) error {
 func (n *Node) Put(keyvalue *KeyValue, empty *struct{}) error {
 	n.Bucket[keyvalue.Key] = keyvalue.Value
 	fmt.Println(*keyvalue, "was added to this node")
+	return nil
+}
+
+//Puts all values from current node ito nodes first successor
+func (n *Node) PutAll(bucket map[string]string, empty *struct{}) error {
+	for key, value := range bucket {
+		n.Bucket[key] = value
+	}
 	return nil
 }
 
@@ -113,6 +123,18 @@ func (n *Node) Get(key string, value *string) error {
 		return nil
 	}
 	return fmt.Errorf("Does not exist: ", key)
+}
+
+func (n *Node) GetAll(address string, empty *struct{}) error {
+	tempBucket := make(map[string]string)
+	for key, value := range n.Bucket {
+		if between(hashString(n.Predecessor), hashString(string(key)), hashString(address), false) {
+			tempBucket[key] = value
+			delete(n.Bucket, key)
+		}
+	}
+	call(address, "PutAll", tempBucket, &struct{}{})
+	return nil
 }
 
 // Delete : delete keyval pairs
@@ -318,6 +340,7 @@ type Node struct {
 	Bucket      map[string]string
 	FingerTable []string
 	Next        int
+	nodeMutex   sync.Mutex
 }
 
 // KeyValue : keyval pairs
@@ -360,7 +383,25 @@ func allCommands() {
 		for {
 			if existingRing {
 				node.checkPredecessor()
+			}
+			time.Sleep(time.Second)
+
+		}
+	}()
+
+	go func() {
+		for {
+			if existingRing {
 				node.stabilize()
+			}
+			time.Sleep(time.Second)
+
+		}
+	}()
+
+	go func() {
+		for {
+			if existingRing {
 				node.fixFingers()
 			}
 			time.Sleep(time.Second)
@@ -469,6 +510,7 @@ func allCommands() {
 				}
 			}
 		case "quit":
+			call(node.Successors[0], "PutAll", node.Bucket, &struct{}{})
 			fmt.Println("You quit")
 			os.Exit(3)
 		default:
